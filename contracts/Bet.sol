@@ -117,5 +117,59 @@ contract Bet is VRFConsumerBaseV2, ConfirmedOwner {
         return (request.fulfilled, request.randomWords);
     }
 
-    function getBet(uint256 betNumber) public payable {}
+    struct BetInfo {
+        uint8 betNumber;
+        bool hasBetPlaced;
+        uint256 betAmount;
+    }
+
+    mapping(address => BetInfo) public userBets;
+
+    uint256 public minBet;
+    uint256 public maxBet;
+
+    function checkBetInfo(
+        address userAddress
+    ) public view returns (uint8, bool, uint256) {
+        BetInfo memory userBet = userBets[userAddress];
+
+        uint8 betNumber = userBet.betNumber;
+        bool hasBetPlaced = userBet.hasBetPlaced;
+        uint256 betAmount = userBet.betAmount;
+
+        return (betNumber, hasBetPlaced, betAmount);
+    }
+
+    function getBetAmount(address userAddress) public view returns (uint256) {
+        (, , uint256 betAmount) = checkBetInfo(userAddress);
+        return betAmount;
+    }
+
+    function getHasBetPlaced(address userAddress) public view returns (bool) {
+        (, bool hasBetPlaced, ) = checkBetInfo(userAddress);
+        return hasBetPlaced;
+    }
+
+    function placeBet(uint8 number) public payable {
+        require(
+            msg.value >= minBet && msg.value <= maxBet,
+            "Bet amount should be within the specified range"
+        );
+        require(
+            number >= 1 && number <= 10,
+            "Number should be within the range of 1 - 10"
+        );
+        require(
+            getHasBetPlaced(msg.sender) == false,
+            "User has bet placed, please wait for round to be finalized"
+        );
+
+        BetInfo memory newBet = BetInfo({
+            betNumber: number,
+            hasBetPlaced: true,
+            betAmount: msg.value
+        });
+
+        userBets[msg.sender] = newBet;
+    }
 }
