@@ -11,12 +11,6 @@ import "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
  * Find information on LINK Token Contracts and get the latest ETH and LINK faucets here: https://docs.chain.link/docs/link-token-contracts/
  */
 
-/**
- * THIS IS AN EXAMPLE CONTRACT THAT USES HARDCODED VALUES FOR CLARITY.
- * THIS IS AN EXAMPLE CONTRACT THAT USES UN-AUDITED CODE.
- * DO NOT USE THIS CODE IN PRODUCTION.
- */
-
 contract Bet is VRFConsumerBaseV2, ConfirmedOwner {
     event RequestSent(uint256 requestId, uint32 numWords);
     event RequestFulfilled(uint256 requestId, uint256[] randomWords);
@@ -117,59 +111,91 @@ contract Bet is VRFConsumerBaseV2, ConfirmedOwner {
         return (request.fulfilled, request.randomWords);
     }
 
+    // Structure to hold bet-related information for each user
     struct BetInfo {
-        uint8 betNumber;
+        uint256 betNumber; // Chosen number for the bet (1-10)
         bool hasBetPlaced;
         uint256 betAmount;
     }
 
+    // Mapping to store the BetInfo for each user
     mapping(address => BetInfo) public userBets;
 
+    // Minimum and maximum bet amounts allowed
     uint256 public minBet;
     uint256 public maxBet;
 
+    bool public roundIsActive;
+
+    event BetPlaced(address userAddress, uint256 number, uint256 amount);
+
+    // Function to check bet information for a specific user
     function checkBetInfo(
         address userAddress
-    ) public view returns (uint8, bool, uint256) {
+    ) public view returns (uint256, bool, uint256) {
         BetInfo memory userBet = userBets[userAddress];
 
-        uint8 betNumber = userBet.betNumber;
+        uint256 betNumber = userBet.betNumber;
         bool hasBetPlaced = userBet.hasBetPlaced;
         uint256 betAmount = userBet.betAmount;
 
         return (betNumber, hasBetPlaced, betAmount);
     }
 
+    function setRoundState() internal {
+        if (roundIsActive) {
+            roundIsActive = false;
+        } else {
+            roundIsActive = true;
+        }
+    }
+
+    // Function to get the bet amount for a specific user
     function getBetAmount(address userAddress) public view returns (uint256) {
         (, , uint256 betAmount) = checkBetInfo(userAddress);
         return betAmount;
     }
 
+    // Function to check if a user has placed a bet
     function getHasBetPlaced(address userAddress) public view returns (bool) {
         (, bool hasBetPlaced, ) = checkBetInfo(userAddress);
         return hasBetPlaced;
     }
 
-    function placeBet(uint8 number) public payable {
+    // Function to allow users to place a bet
+    function placeBet(uint256 number) public payable {
+        require(
+            roundIsActive,
+            "Round is inactive please wait for the next round"
+        );
+        // Check if the sent value falls within the specified range
         require(
             msg.value >= minBet && msg.value <= maxBet,
             "Bet amount should be within the specified range"
         );
+        // Check if the chosen number is within the valid range
         require(
             number >= 1 && number <= 10,
             "Number should be within the range of 1 - 10"
         );
+        // Check if the user has not already placed a bet
         require(
             getHasBetPlaced(msg.sender) == false,
             "User has bet placed, please wait for round to be finalized"
         );
 
+        // Create a new BetInfo instance with the provided values
         BetInfo memory newBet = BetInfo({
             betNumber: number,
             hasBetPlaced: true,
             betAmount: msg.value
         });
 
+        // Assign the new BetInfo instance to the user's address in the mapping
         userBets[msg.sender] = newBet;
+
+        emit BetPlaced(msg.sender, number, msg.value);
     }
+
+    function settleBet(uint256 winningNumber) public {}
 }
